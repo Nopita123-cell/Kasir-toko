@@ -1,0 +1,72 @@
+:root{
+  /* Colors (from DESIGN-revolut.md, adjusted) */
+  --color-primary:#494fdf;
+  --color-primary-bright:#4f55f1;
+  --canvas-light:#ffffff;
+  --canvas-dark:#000000;
+  --surface-elevated:#16181a;
+  --ink:#191c1f;
+  --on-primary:#ffffff;
+  --muted:#505a63;
+  --surface-soft:#f4f4f4;
+
+  /* Typography sizes (tokens) */
+  --display-xxl:136px;
+  --display-xl:80px;
+  --display-lg:48px;
+  --display-md:40px;
+  --heading-lg:32px;
+  --body-md:16px;
+
+  --radius-sm:8px;
+  --radius-md:12px;
+  --radius-lg:20px;
+  --radius-full:9999px;
+}
+
+/* Base */
+body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:var(--ink); background:var(--canvas-light);}
+
+/* Display font helper (Poppins as display-like) */
+.display-font{font-family:Poppins, Inter, sans-serif; font-weight:500}
+
+/* Hero band (dark) */
+.hero-band{background:var(--canvas-dark); color:var(--canvas-light); padding:6rem 1rem; border-radius:0;}
+.hero-band .display{font-size:var(--display-xl); line-height:1; font-family:Poppins, Inter, sans-serif}
+.hero-band p{color:var(--on-primary)}
+.hero-cta{background:var(--canvas-light); color:var(--canvas-dark); border-radius:9999px; padding:14px 28px; display:inline-block}
+
+/* Pill button */
+.button-pill{border-radius:var(--radius-full); padding:12px 24px; height:48px}
+.button-pill.btn-primary{background:var(--canvas-light); color:var(--canvas-dark); border:none}
+
+/* Plan card */
+.plan-card{background:var(--surface-elevated); color:var(--canvas-light); border-radius:var(--radius-lg); padding:24px}
+.plan-card.featured{background:var(--color-primary); color:var(--on-primary)}
+.plan-card h2, .plan-card h5{font-family:Poppins, Inter, sans-serif}
+
+/* Text input */
+.text-input{background:var(--canvas-light); color:var(--ink); border-radius:var(--radius-md); padding:12px 14px; height:56px; border:1px solid #e6e6e6}
+.search-input{height:48px; padding:8px 12px}
+
+/* Utility for full-bleed sections inside container wrapper */
+.full-bleed{width:100%; margin-left:calc(-50vw + 50%); margin-right:calc(-50vw + 50%);}
+
+/* Simple responsive typographic scale */
+h1{font-size:var(--display-lg)}
+h2{font-size:var(--display-md)}
+
+/* Product card */
+.product-card{background:#0f1112; color:var(--canvas-light); border-radius:12px; padding:12px}
+.product-card h6{font-family:Poppins, Inter, sans-serif}
+
+/* Keyboard focus styles */
+.product-card.focused{outline:3px solid rgba(73,79,223,0.24)}
+
+/* Dark mode overrides */
+body.dark{background:var(--canvas-dark); color:var(--canvas-light)}
+body.dark .navbar{background:var(--surface-elevated) !important}
+body.dark .plan-card{background:#1f2226; color:var(--canvas-light)}
+body.dark .card{background:#0f1112}
+body.dark .table-dark{background:transparent}
+body.dark .text-muted{color:rgba(255,255,255,0.72)}
