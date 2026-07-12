@@ -31,10 +31,11 @@ body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 .display-font{font-family:Poppins, Inter, sans-serif; font-weight:500}
 
 /* Hero band (dark) */
-.hero-band{background:var(--canvas-dark); color:var(--canvas-light); padding:6rem 1rem; border-radius:0;}
+.hero-band{background:linear-gradient(135deg, #0f1112 0%, #16181a 45%, #494fdf 100%); color:var(--canvas-light); padding:6rem 1rem; border-radius:0; position:relative; overflow:hidden;}
+.hero-band::before{content:""; position:absolute; inset:0; background:radial-gradient(circle at top right, rgba(255,255,255,0.16), transparent 35%); pointer-events:none;}
 .hero-band .display{font-size:var(--display-xl); line-height:1; font-family:Poppins, Inter, sans-serif}
 .hero-band p{color:var(--on-primary)}
-.hero-cta{background:var(--canvas-light); color:var(--canvas-dark); border-radius:9999px; padding:14px 28px; display:inline-block}
+.hero-cta{background:var(--canvas-light); color:var(--canvas-dark); border-radius:9999px; padding:14px 28px; display:inline-block; box-shadow:0 10px 30px rgba(0,0,0,0.2)}
 
 /* Pill button */
 .button-pill{border-radius:var(--radius-full); padding:12px 24px; height:48px}
