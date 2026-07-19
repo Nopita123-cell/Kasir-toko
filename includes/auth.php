@@ -7,7 +7,7 @@ require_once __DIR__ . '/functions.php';
 function require_login()
 {
     if (empty($_SESSION['user'])) {
-        header('Location: /kasir/login.php');
+        header('Location: /Kasir/login.php');
         exit;
     }
 }

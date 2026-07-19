@@ -3,16 +3,52 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/koneksi.php';
 require_login();
 $cart = $_SESSION['cart'] ?? [];
+if (isset($_GET['clear'])) {
+    unset($_SESSION['cart']);
+    $cart = [];
+    flash_set('success', 'Keranjang berhasil dibersihkan.');
+    redirect('/Kasir/kasir/transaksi.php');
+}
+if (isset($_GET['remove'])) {
+    $removeId = (string)intval($_GET['remove']);
+    unset($cart[$removeId]);
+    $_SESSION['cart'] = $cart;
+    flash_set('success', 'Item dihapus dari keranjang.');
+    redirect('/Kasir/kasir/transaksi.php');
+}
+if (isset($_GET['update'])) {
+    $updateId = (string)intval($_GET['update']);
+    $qty = max(1, intval($_GET['qty'] ?? 1));
+    if (isset($cart[$updateId])) {
+        $stmt = $pdo->prepare('SELECT stok FROM produk WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $updateId]);
+        $productStock = (int)$stmt->fetchColumn();
+        if ($qty > $productStock) {
+            flash_set('error', 'Stok produk tidak mencukupi untuk qty yang diminta.');
+        } else {
+            $cart[$updateId]['quantity'] = $qty;
+            $_SESSION['cart'] = $cart;
+            flash_set('success', 'Qty keranjang berhasil diperbarui.');
+        }
+    }
+    redirect('/Kasir/kasir/transaksi.php');
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $productId = intval($_POST['product_id'] ?? 0);
     $quantity = max(1, intval($_POST['quantity'] ?? 1));
-    $stmt = $pdo->prepare('SELECT * FROM produk WHERE id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, nama, harga, stok FROM produk WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $productId]);
     $product = $stmt->fetch();
     if ($product) {
         $key = (string)$productId;
+        $existingQty = isset($cart[$key]) ? (int)$cart[$key]['quantity'] : 0;
+        $newQty = $existingQty + $quantity;
+        if ($newQty > (int)$product['stok']) {
+            flash_set('error', 'Stok tidak cukup. Sisa stok: ' . (int)$product['stok']);
+            redirect('/Kasir/kasir/transaksi.php');
+        }
         if (isset($cart[$key])) {
-            $cart[$key]['quantity'] += $quantity;
+            $cart[$key]['quantity'] = $newQty;
         } else {
             $cart[$key] = [
                 'id' => $product['id'],
@@ -23,15 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $_SESSION['cart'] = $cart;
         flash_set('success', 'Produk ditambahkan ke keranjang.');
-        redirect('/kasir/transaksi.php');
+        redirect('/Kasir/kasir/transaksi.php');
     }
-}
-if (isset($_GET['remove'])) {
-    $removeId = (string)intval($_GET['remove']);
-    unset($cart[$removeId]);
-    $_SESSION['cart'] = $cart;
-    flash_set('success', 'Item dihapus dari keranjang.');
-    redirect('/kasir/transaksi.php');
 }
 $products = $pdo->query('SELECT p.*, k.nama AS kategori FROM produk p LEFT JOIN kategori k ON p.kategori_id = k.id ORDER BY p.nama ASC')->fetchAll();
 $total = array_reduce($cart, fn($carry, $item) => $carry + ($item['harga'] * $item['quantity']), 0);
@@ -40,12 +69,18 @@ include __DIR__ . '/../includes/header.php';
 <div class="container py-5">
   <div class="row">
     <div class="col-lg-8">
-      <div class="d-flex justify-content-between align-items-center mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-4 gap-2 flex-wrap">
         <h1 class="display-6">Transaksi Kasir</h1>
-        <a href="/kasir/kasir/payment.php" class="btn btn-primary button-pill">Lanjut ke Pembayaran</a>
+        <div class="d-flex gap-2">
+          <a href="/Kasir/kasir/index.php" class="btn btn-outline-secondary button-pill">Kembali ke Dashboard</a>
+          <a href="/Kasir/kasir/payment.php" class="btn btn-primary button-pill">Lanjut ke Pembayaran</a>
+        </div>
       </div>
       <?php if ($msg = flash_get('success')): ?>
         <div class="alert alert-success"><?= safe($msg) ?></div>
+      <?php endif; ?>
+      <?php if ($err = flash_get('error')): ?>
+        <div class="alert alert-danger"><?= safe($err) ?></div>
       <?php endif; ?>
       <div class="card p-4 mb-4">
         <h5>Daftar Produk</h5>
@@ -64,9 +99,10 @@ include __DIR__ . '/../includes/header.php';
                 <h6><?= safe($product['nama']) ?></h6>
                 <p class="mb-1 small text-muted"><?= safe($product['kategori'] ?? 'Umum') ?></p>
                 <p class="mb-2">Rp <?= number_format($product['harga'],0,',','.') ?></p>
+                <p class="small text-muted mb-2">Stok: <?= (int)$product['stok'] ?></p>
                 <form method="post" class="add-form d-flex gap-2">
                   <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
-                  <input type="number" name="quantity" min="1" value="1" class="form-control text-input qty-input" style="width:80px;">
+                  <input type="number" name="quantity" min="1" max="<?= (int)$product['stok'] ?>" value="1" class="form-control text-input qty-input" style="width:80px;">
                   <button type="submit" class="btn btn-light button-pill add-btn">Tambah</button>
                 </form>
               </div>
@@ -83,19 +119,41 @@ include __DIR__ . '/../includes/header.php';
         <?php else: ?>
           <ul class="list-group list-group-flush mb-3">
             <?php foreach ($cart as $item): ?>
-              <li class="list-group-item d-flex justify-content-between align-items-center bg-dark text-white">
-                <div>
-                  <strong><?= safe($item['nama']) ?></strong><br>
-                  <?= $item['quantity'] ?> x Rp <?= number_format($item['harga'],0,',','.') ?>
+              <li class="list-group-item bg-dark text-white">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <strong><?= safe($item['nama']) ?></strong><br>
+                    <?= $item['quantity'] ?> x Rp <?= number_format($item['harga'],0,',','.') ?>
+                  </div>
+                  <a href="?remove=<?= $item['id'] ?>" class="btn btn-sm btn-outline-light">Hapus</a>
                 </div>
-                <a href="?remove=<?= $item['id'] ?>" class="btn btn-sm btn-outline-light">Hapus</a>
+                <div class="d-flex gap-2 mt-2 align-items-center">
+                  <form method="get" class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="update" value="<?= $item['id'] ?>">
+                    <input type="hidden" name="qty" value="<?= max(1, (int)$item['quantity'] - 1) ?>">
+                    <button class="btn btn-sm btn-outline-light" type="submit" title="Kurangi qty">−</button>
+                  </form>
+                  <form method="get" class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="update" value="<?= $item['id'] ?>">
+                    <input type="hidden" name="qty" value="<?= (int)$item['quantity'] + 1 ?>">
+                    <button class="btn btn-sm btn-outline-light" type="submit" title="Tambah qty">+</button>
+                  </form>
+                  <form method="get" class="d-flex gap-2 align-items-center flex-grow-1">
+                    <input type="hidden" name="update" value="<?= $item['id'] ?>">
+                    <input type="number" name="qty" min="1" value="<?= (int)$item['quantity'] ?>" class="form-control form-control-sm text-input" style="width:90px;">
+                    <button class="btn btn-sm btn-light" type="submit">Ubah</button>
+                  </form>
+                </div>
               </li>
             <?php endforeach; ?>
           </ul>
           <div class="mb-3">
             <div class="d-flex justify-content-between mb-2"><span>Total</span><strong>Rp <?= number_format($total,0,',','.') ?></strong></div>
           </div>
-          <a href="/kasir/payment.php" class="btn btn-primary w-100 button-pill">Bayar Sekarang</a>
+          <div class="d-grid gap-2">
+            <a href="/Kasir/kasir/payment.php" class="btn btn-primary w-100 button-pill">Bayar Sekarang</a>
+            <a href="?clear=1" class="btn btn-outline-light w-100 button-pill" onclick="return confirm('Bersihkan seluruh keranjang?')">Bersihkan Keranjang</a>
+          </div>
         <?php endif; ?>
       </div>
     </div>
@@ -171,7 +229,7 @@ include __DIR__ . '/../includes/header.php';
     if (q.length < 2){ taList.style.display='none'; return; }
     clearTimeout(taTimer);
     taTimer = setTimeout(()=>{
-      fetch('/api/products.php?q=' + encodeURIComponent(q)).then(r=>r.json()).then(items=>{
+      fetch('/Kasir/api/products.php?q=' + encodeURIComponent(q)).then(r=>r.json()).then(items=>{
         taList.innerHTML = '';
         if (!items || !items.length){ taList.style.display='none'; return; }
         items.forEach((it, i)=>{
@@ -194,7 +252,7 @@ include __DIR__ . '/../includes/header.php';
   // barcode input handling: focus hidden input on 'b'
   const barcodeInput = document.getElementById('barcode-input');
   document.addEventListener('keydown', function(e){ if (e.key === 'b' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); barcodeInput.focus(); barcodeInput.value=''; } });
-  barcodeInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { const code = this.value.trim(); if (code) fetch('/api/products.php?q=' + encodeURIComponent(code)).then(r=>r.json()).then(items=>{ if (items && items.length){ addByAjax(items[0].id,1); } else alert('Produk barcode tidak ditemukan'); this.value=''; } ); } });
+  barcodeInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { const code = this.value.trim(); if (code) fetch('/Kasir/api/products.php?q=' + encodeURIComponent(code)).then(r=>r.json()).then(items=>{ if (items && items.length){ addByAjax(items[0].id,1); } else alert('Produk barcode tidak ditemukan'); this.value=''; } ); } });
 
   // quick-add by number key (1..9)
   document.addEventListener('keydown', function(e){ if (!isNaN(parseInt(e.key)) && e.key !== '0' && document.activeElement.tagName !== 'INPUT'){
@@ -203,7 +261,7 @@ include __DIR__ . '/../includes/header.php';
 
   // addByAjax helper
   function addByAjax(id, qty){
-    fetch('/kasir/api_add.php', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'product_id='+encodeURIComponent(id)+'&quantity='+encodeURIComponent(qty) })
+    fetch('/Kasir/kasir/api_add.php', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'product_id='+encodeURIComponent(id)+'&quantity='+encodeURIComponent(qty) })
       .then(r=>r.json()).then(function(res){ if (res.ok) location.reload(); else alert(res.error || 'Gagal menambahkan'); });
   }
 })();
