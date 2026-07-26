@@ -7,20 +7,34 @@ if (($_SESSION['user']['role'] ?? '') !== 'Admin') {
   exit('Forbidden');
 }
 $flash = flash_get('success');
+$errorFlash = flash_get('error');
 $errors = [];
 
 // Handle delete
 if (isset($_GET['delete'])) {
   $delId = intval($_GET['delete']);
-  $stmt = $pdo->prepare('SELECT image FROM produk WHERE id = :id LIMIT 1');
-  $stmt->execute(['id' => $delId]);
-  $row = $stmt->fetch();
-  if ($row && !empty($row['image'])) {
-    $p = __DIR__ . '/../../assets/images/' . basename($row['image']);
-    if (is_file($p)) @unlink($p);
+  try {
+    $pdo->beginTransaction();
+
+    $stmt = $pdo->prepare('SELECT image FROM produk WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $delId]);
+    $row = $stmt->fetch();
+    if ($row && !empty($row['image'])) {
+      $p = __DIR__ . '/../../assets/images/' . basename($row['image']);
+      if (is_file($p)) @unlink($p);
+    }
+
+    $pdo->prepare('DELETE FROM detail_transaksi WHERE produk_id = :id')->execute(['id' => $delId]);
+    $pdo->prepare('DELETE FROM produk WHERE id = :id')->execute(['id' => $delId]);
+
+    $pdo->commit();
+    flash_set('success', 'Produk berhasil dihapus.');
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    flash_set('error', 'Gagal menghapus produk: ' . $e->getMessage());
   }
-  $pdo->prepare('DELETE FROM produk WHERE id = :id')->execute(['id' => $delId]);
-  flash_set('success', 'Produk berhasil dihapus.');
   redirect('/Kasir/admin/produk/index.php');
 }
 
@@ -66,6 +80,9 @@ include __DIR__ . '/../../includes/header.php';
         </div>
         <?php if ($flash): ?>
         <div class="alert alert-success"><?= safe($flash) ?></div>
+        <?php endif; ?>
+        <?php if ($errorFlash): ?>
+        <div class="alert alert-danger"><?= safe($errorFlash) ?></div>
         <?php endif; ?>
         <?php if ($errors): ?>
         <div class="alert alert-danger">

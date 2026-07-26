@@ -10,7 +10,7 @@ function admin_nav_item(string $href, string $label, string $icon, string $curre
   <div class="brand">
     <div class="brand-badge">W</div>
     <div>
-      <h5>Web Kasir</h5>
+      <h5>Web Kasir Nopita</h5>
       <p>Admin Panel</p>
     </div>
   </div>
